@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calidad de Vida y Talla — Taller</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+  :root {
+    --pink:#e8a0b4; --blue:#beedf3; --lilac:#f3d9ed; --lavender:#ede7f3; --cream:#fdfbf8;
+    --pink-dk:#c4607e; --blue-dk:#3aacbf; --lilac-dk:#b865a8; --lavender-dk:#7b5ea7;
+    --pink-txt:#7a2a40; --blue-txt:#1a5f6a; --lilac-txt:#6b2962; --lavender-txt:#4a3570;
+    --text:#2a2825; --text2:#6b6860; --text3:#9b9890;
+    --bg:#ffffff; --bg2:#fdfbf8; --bg3:#f5f2ee;
+    --border:rgba(0,0,0,0.10); --border2:rgba(0,0,0,0.18);
+    --radius:10px; --radius-lg:14px;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg2); color:var(--text); font-size:15px; line-height:1.6; }
+
+  .nav { background:var(--bg); border-bottom:1px solid var(--border); padding:0 20px; display:flex; align-items:center; }
+  .nav-title { font-size:13px; font-weight:500; color:var(--text3); margin-right:auto; padding:14px 0; }
+  .nav-btn { padding:14px 20px; font-size:13px; font-weight:500; border:none; background:none; cursor:pointer; color:var(--text2); border-bottom:2px solid transparent; transition:all 0.15s; }
+  .nav-btn.active { color:var(--lavender-dk); border-bottom-color:var(--lavender-dk); }
+
+  .view { display:none; }
+  .view.active { display:block; }
+
+  /* SURVEY */
+  .survey-wrap { max-width:640px; margin:0 auto; padding:24px 16px 60px; }
+  .survey-header { background:var(--lavender-dk); color:white; border-radius:var(--radius-lg); padding:22px 24px; margin-bottom:24px; }
+  .survey-header h1 { font-size:18px; font-weight:500; margin-bottom:4px; }
+  .survey-header p { font-size:13px; opacity:0.88; line-height:1.5; }
+  .progress-bar { height:4px; background:rgba(255,255,255,0.30); border-radius:2px; margin-top:14px; }
+  .progress-fill { height:100%; background:white; border-radius:2px; transition:width 0.3s; }
+
+  .stature-section { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-lg); padding:18px 20px; margin-bottom:20px; }
+  .stature-label { font-size:13px; font-weight:500; color:var(--text2); margin-bottom:10px; }
+  .stature-options { display:flex; gap:8px; flex-wrap:wrap; }
+  .stature-opt { flex:1; min-width:110px; padding:10px 8px; border:1.5px solid var(--border2); border-radius:var(--radius); text-align:center; cursor:pointer; font-size:13px; font-weight:500; color:var(--text2); background:var(--bg); transition:all 0.15s; }
+  .stature-opt.selected { border-color:var(--lavender-dk); background:var(--lavender); color:var(--lavender-txt); }
+
+  .domain-block { margin-bottom:20px; }
+  .domain-label { font-size:12px; font-weight:500; color:var(--text3); text-transform:uppercase; letter-spacing:0.6px; margin-bottom:10px; display:flex; align-items:center; gap:8px; }
+  .domain-dot { width:9px; height:9px; border-radius:50%; display:inline-block; flex-shrink:0; }
+
+  .item-card { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; margin-bottom:8px; }
+  .item-q { font-size:14px; color:var(--text); margin-bottom:11px; line-height:1.5; }
+  .likert { display:flex; gap:5px; }
+  .likert-btn { flex:1; padding:7px 3px; border:1.5px solid var(--border2); border-radius:7px; text-align:center; cursor:pointer; font-size:11px; color:var(--text2); background:var(--bg); transition:all 0.15s; line-height:1.3; user-select:none; }
+  .likert-btn.sel { font-weight:500; border-color:var(--lavender-dk); background:var(--lavender); color:var(--lavender-txt); }
+
+  .submit-btn { width:100%; padding:14px; background:var(--lavender-dk); color:white; border:none; border-radius:var(--radius); font-size:15px; font-weight:500; cursor:pointer; margin-top:16px; transition:background 0.15s; }
+  .submit-btn:hover { background:var(--lilac-dk); }
+  .submit-btn:disabled { background:var(--text3); cursor:not-allowed; }
+
+  .success-msg { text-align:center; padding:48px 20px; }
+  .success-icon { width:64px; height:64px; border-radius:50%; background:var(--lavender); display:flex; align-items:center; justify-content:center; margin:0 auto 18px; }
+  .success-icon svg { width:30px; height:30px; stroke:var(--lavender-dk); fill:none; stroke-width:2.5; }
+  .success-msg h2 { font-size:19px; font-weight:500; margin-bottom:8px; }
+  .success-msg p { color:var(--text2); font-size:14px; line-height:1.6; }
+
+  /* DASHBOARD */
+  .dash-wrap { max-width:1100px; margin:0 auto; padding:24px 20px 60px; }
+  .dash-top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:12px; }
+  .dash-title { font-size:20px; font-weight:500; }
+  .dash-sub { font-size:13px; color:var(--text2); margin-top:3px; }
+  .dash-controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .ctrl-btn { padding:8px 14px; border:1px solid var(--border2); border-radius:8px; background:var(--bg); font-size:13px; cursor:pointer; color:var(--text); transition:background 0.12s; }
+  .ctrl-btn:hover { background:var(--bg3); }
+  .ctrl-btn.danger { color:#a32d2d; border-color:#f09595; }
+  .status-dot { width:8px; height:8px; border-radius:50%; background:#9b9890; display:inline-block; margin-right:6px; transition:background 0.3s; }
+  .status-dot.live { background:#3aacbf; }
+  .status-label { font-size:12px; color:var(--text2); }
+
+  .filter-row { display:flex; gap:7px; margin-bottom:22px; flex-wrap:wrap; }
+  .sf-btn { padding:6px 15px; border:1.5px solid var(--border2); border-radius:20px; font-size:12px; font-weight:500; cursor:pointer; background:var(--bg); color:var(--text2); transition:all 0.15s; }
+  .sf-btn.active { background:var(--lavender); border-color:var(--lavender-dk); color:var(--lavender-txt); }
+
+  .metrics-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:12px; margin-bottom:24px; }
+  .metric { background:var(--bg3); border-radius:var(--radius); padding:14px 16px; }
+  .metric-label { font-size:11px; color:var(--text3); font-weight:500; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px; }
+  .metric-val { font-size:26px; font-weight:500; color:var(--text); }
+  .metric-sub { font-size:11px; color:var(--text2); margin-top:2px; }
+
+  .charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:22px; }
+  .chart-card { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-lg); padding:20px; }
+  .chart-card.full { grid-column:1 / -1; }
+  .chart-title { font-size:14px; font-weight:500; margin-bottom:3px; }
+  .chart-sub { font-size:12px; color:var(--text2); margin-bottom:14px; }
+  .legend-row { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:12px; font-size:12px; color:var(--text2); }
+  .legend-item { display:flex; align-items:center; gap:5px; }
+  .legend-sq { width:10px; height:10px; border-radius:2px; display:inline-block; }
+
+  .table-card { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; margin-bottom:16px; }
+  .table-card table { width:100%; border-collapse:collapse; font-size:13px; }
+  .table-card th { background:var(--bg3); padding:10px 14px; text-align:left; font-size:11px; font-weight:500; color:var(--text2); text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid var(--border); }
+  .table-card td { padding:10px 14px; border-bottom:1px solid var(--border); color:var(--text); }
+  .table-card tr:last-child td { border-bottom:none; }
+  .score-bar-wrap { display:flex; align-items:center; gap:8px; }
+  .score-bar { height:8px; border-radius:4px; display:inline-block; min-width:4px; }
+  .note-footer { font-size:11px; color:var(--text3); text-align:right; margin-top:4px; line-height:1.6; }
+
+  .empty-state { text-align:center; padding:64px 20px; color:var(--text2); }
+  .empty-state p { font-size:15px; margin-bottom:8px; }
+  .empty-state small { font-size:13px; }
+
+  .connecting { text-align:center; padding:40px 20px; color:var(--text2); font-size:14px; }
+
+  @media (max-width:600px) {
+    .charts-grid { grid-template-columns:1fr; }
+    .charts-grid .chart-card.full { grid-column:1; }
+    .likert { gap:3px; }
+    .likert-btn { font-size:9px; padding:6px 2px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <span class="nav-title">CVS y Talla · Taller didáctico</span>
+  <button class="nav-btn active" onclick="switchView('survey')">Encuesta</button>
+  <button class="nav-btn" onclick="switchView('dashboard')">Dashboard</button>
+</div>
+
+<!-- SURVEY -->
+<div id="view-survey" class="view active">
+  <div class="survey-wrap">
+    <div id="survey-form">
+      <div class="survey-header">
+        <h1>Calidad de vida y talla</h1>
+        <p>Responda desde su propia experiencia personal. Sus respuestas son anónimas y se usarán solo con fines didácticos en este taller.</p>
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+      </div>
+
+      <div class="stature-section">
+        <div class="stature-label">Su estatura actual:</div>
+        <div class="stature-options">
+          <div class="stature-opt" data-g="A" onclick="selectStature(this)">≤ 160 cm</div>
+          <div class="stature-opt" data-g="B" onclick="selectStature(this)">161 – 175 cm</div>
+          <div class="stature-opt" data-g="C" onclick="selectStature(this)">&gt; 175 cm</div>
+        </div>
+      </div>
+
+      <div class="domain-block">
+        <div class="domain-label"><span class="domain-dot" style="background:#c4607e"></span>Dominio físico</div>
+        <div id="items-fisico"></div>
+      </div>
+      <div class="domain-block">
+        <div class="domain-label"><span class="domain-dot" style="background:#3aacbf"></span>Dominio social</div>
+        <div id="items-social"></div>
+      </div>
+      <div class="domain-block">
+        <div class="domain-label"><span class="domain-dot" style="background:#b865a8"></span>Dominio emocional</div>
+        <div id="items-emocional"></div>
+      </div>
+      <div class="domain-block">
+        <div class="domain-label"><span class="domain-dot" style="background:#7b5ea7"></span>Dominio afrontamiento</div>
+        <div id="items-afrontamiento"></div>
+      </div>
+
+      <button class="submit-btn" id="submit-btn" onclick="submitSurvey()" disabled>Enviar respuestas</button>
+    </div>
+
+    <div id="survey-success" style="display:none">
+      <div class="success-msg">
+        <div class="success-icon">
+          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </div>
+        <h2>Respuestas enviadas</h2>
+        <p>Gracias por participar.<br>Los resultados se actualizan en tiempo real en el dashboard.</p>
+        <button class="submit-btn" style="margin-top:28px;max-width:280px;margin-left:auto;margin-right:auto;display:block" onclick="resetSurvey()">Responder de nuevo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="view-dashboard" class="view">
+  <div class="dash-wrap">
+    <div class="dash-top">
+      <div>
+        <div class="dash-title">Dashboard en tiempo real</div>
+        <div class="dash-sub">Calidad de vida y talla · Puntuación QoLISSY (Bullinger et al., 2013)</div>
+      </div>
+      <div class="dash-controls">
+        <span class="status-label"><span class="status-dot" id="status-dot"></span><span id="status-text">Conectando...</span></span>
+        <button class="ctrl-btn danger" onclick="clearData()">Limpiar datos</button>
+      </div>
+    </div>
+
+    <div class="filter-row">
+      <button class="sf-btn active" data-g="all" onclick="setFilter(this,'all')">Todos los grupos</button>
+      <button class="sf-btn" data-g="A" onclick="setFilter(this,'A')">≤ 160 cm</button>
+      <button class="sf-btn" data-g="B" onclick="setFilter(this,'B')">161–175 cm</button>
+      <button class="sf-btn" data-g="C" onclick="setFilter(this,'C')">&gt; 175 cm</button>
+    </div>
+
+    <div id="dash-content">
+      <div class="connecting">Conectando con Firebase...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== FIREBASE CONFIG =====
+const firebaseConfig = {
+  apiKey: "AIzaSyDAC9xxpLrwkqIMxQr7CtqHUlN7KGDF6oI",
+  authDomain: "taller-cvs.firebaseapp.com",
+  databaseURL: "https://taller-cvs-default-rtdb.firebaseio.com",
+  projectId: "taller-cvs",
+  storageBucket: "taller-cvs.firebasestorage.app",
+  messagingSenderId: "666085769247",
+  appId: "1:666085769247:web:6cbcb859a5116633dc552a"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const responsesRef = db.ref('responses');
+
+// ===== ITEMS =====
+const ITEMS = {
+  fisico: [
+    { id:'f1', q:'Hay actividades físicas cotidianas que me resultan difíciles por mi talla.', rev:false },
+    { id:'f2', q:'En entornos públicos o laborales encuentro barreras físicas relacionadas con mi talla (alcanzar objetos, mobiliario, transporte).', rev:false },
+    { id:'f3', q:'Mi talla limita mi participación en actividades deportivas o recreativas.', rev:false }
+  ],
+  social: [
+    { id:'s1', q:'Creo que las personas más altas tienen más ventajas sociales o profesionales que yo.', rev:true },
+    { id:'s2', q:'Creo que mi vida sería más fácil si fuera más alto/a.', rev:true },
+    { id:'s3', q:'Me siento cómodo/a en mis relaciones sociales independientemente de mi talla.', rev:false }
+  ],
+  emocional: [
+    { id:'e1', q:'Me he sentido triste o frustrado/a en algún momento por mi talla.', rev:true },
+    { id:'e2', q:'Me siento bien con mi imagen corporal y mi estatura.', rev:false },
+    { id:'e3', q:'La talla ha sido una fuente de inseguridad en alguna etapa de mi vida.', rev:true }
+  ],
+  afrontamiento: [
+    { id:'a1', q:'He desarrollado estrategias para adaptarme a situaciones en las que mi talla representa una desventaja.', rev:false },
+    { id:'a2', q:'En general, mi talla no define mi calidad de vida.', rev:false }
+  ]
+};
+
+const SCALE = ['Nunca','Rara vez','A veces','Frecuentemente','Siempre'];
+
+const DM = {
+  fisico:        { label:'Físico',        color:'#e8a0b4', dk:'#c4607e' },
+  social:        { label:'Social',        color:'#beedf3', dk:'#3aacbf' },
+  emocional:     { label:'Emocional',     color:'#f3d9ed', dk:'#b865a8' },
+  afrontamiento: { label:'Afrontamiento', color:'#ede7f3', dk:'#7b5ea7' }
+};
+
+const GM = {
+  A: { label:'≤ 160 cm',   color:'#e8a0b4', dk:'#c4607e' },
+  B: { label:'161–175 cm', color:'#beedf3', dk:'#3aacbf' },
+  C: { label:'> 175 cm',   color:'#ede7f3', dk:'#7b5ea7' }
+};
+
+let responses = {};
+let charts = {};
+let filterGroup = 'all';
+
+// ===== SCORING — Bullinger et al. 2013 =====
+// item_score = rev ? (4 - raw) : raw
+// domain_score = (mean(item_scores) / 4) * 100
+// total = mean(domain_scores)
+function itemScore(raw, rev) { return rev ? (4 - raw) : raw; }
+
+function domainScore(answers, domain) {
+  const scores = ITEMS[domain]
+    .filter(it => answers[it.id] !== undefined)
+    .map(it => itemScore(answers[it.id], it.rev));
+  if (!scores.length) return null;
+  return Math.round((scores.reduce((a,b)=>a+b,0) / scores.length / 4) * 100);
+}
+
+function totalScore(answers) {
+  const ds = Object.keys(ITEMS).map(d => domainScore(answers, d)).filter(v => v !== null);
+  if (!ds.length) return null;
+  return Math.round(ds.reduce((a,b)=>a+b,0) / ds.length);
+}
+
+function avg(arr) {
+  const v = arr.filter(x => x !== null && x !== undefined);
+  if (!v.length) return null;
+  return Math.round(v.reduce((a,b)=>a+b,0) / v.length);
+}
+
+// ===== FIREBASE LISTENER =====
+responsesRef.on('value', snapshot => {
+  responses = snapshot.val() || {};
+  setStatus(true);
+  if (document.getElementById('view-dashboard').classList.contains('active')) {
+    renderDashboard();
+  }
+}, err => {
+  setStatus(false);
+  console.error(err);
+});
+
+function setStatus(connected) {
+  const dot = document.getElementById('status-dot');
+  const txt = document.getElementById('status-text');
+  if (!dot) return;
+  if (connected) {
+    dot.classList.add('live');
+    txt.textContent = 'En vivo · ' + Object.keys(responses).length + ' respuestas';
+  } else {
+    dot.classList.remove('live');
+    txt.textContent = 'Sin conexión';
+  }
+}
+
+// ===== SURVEY =====
+function buildSurvey() {
+  Object.entries(ITEMS).forEach(([domain, items]) => {
+    const c = document.getElementById('items-' + domain);
+    c.innerHTML = '';
+    items.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'item-card';
+      card.innerHTML = `<div class="item-q">${item.q}</div>
+        <div class="likert">${SCALE.map((lbl,i) =>
+          `<div class="likert-btn" data-v="${i}" data-id="${item.id}" onclick="selectLikert(this)">
+            <span style="font-size:13px;font-weight:500">${i}</span><br>
+            <span style="font-size:9px;line-height:1.2">${lbl}</span>
+          </div>`).join('')}</div>`;
+      c.appendChild(card);
+    });
+  });
+}
+
+function selectStature(el) {
+  document.querySelectorAll('.stature-opt').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  checkProgress();
+}
+
+function selectLikert(btn) {
+  document.querySelectorAll(`.likert-btn[data-id="${btn.dataset.id}"]`).forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+  checkProgress();
+}
+
+function getAnswers() {
+  const ans = {};
+  Object.values(ITEMS).flat().forEach(it => {
+    const s = document.querySelector(`.likert-btn.sel[data-id="${it.id}"]`);
+    if (s) ans[it.id] = parseInt(s.dataset.v);
+  });
+  return ans;
+}
+
+function checkProgress() {
+  const total = Object.values(ITEMS).flat().length;
+  const ans = getAnswers();
+  const n = Object.keys(ans).length;
+  document.getElementById('progress-fill').style.width = Math.round(n/total*100) + '%';
+  document.getElementById('submit-btn').disabled = !(n === total && document.querySelector('.stature-opt.selected'));
+}
+
+function submitSurvey() {
+  const st = document.querySelector('.stature-opt.selected');
+  const ans = getAnswers();
+  if (!st || Object.keys(ans).length < Object.values(ITEMS).flat().length) return;
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+
+  responsesRef.push({
+    group: st.dataset.g,
+    answers: ans,
+    ts: new Date().toISOString()
+  }).then(() => {
+    document.getElementById('survey-form').style.display = 'none';
+    document.getElementById('survey-success').style.display = 'block';
+  }).catch(err => {
+    btn.disabled = false;
+    btn.textContent = 'Enviar respuestas';
+    alert('Error al enviar. Verifique su conexión a internet.');
+    console.error(err);
+  });
+}
+
+function resetSurvey() {
+  document.getElementById('survey-form').style.display = 'block';
+  document.getElementById('survey-success').style.display = 'none';
+  document.querySelectorAll('.stature-opt,.likert-btn').forEach(e => e.classList.remove('selected','sel'));
+  document.getElementById('submit-btn').textContent = 'Enviar respuestas';
+  checkProgress();
+}
+
+// ===== DASHBOARD =====
+function setFilter(btn, g) {
+  document.querySelectorAll('.sf-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  filterGroup = g;
+  renderDashboard();
+}
+
+function renderDashboard() {
+  const container = document.getElementById('dash-content');
+  const allResp = Object.values(responses);
+
+  // Update status
+  const dot = document.getElementById('status-dot');
+  const txt = document.getElementById('status-text');
+  if (dot) { dot.classList.add('live'); txt.textContent = 'En vivo · ' + allResp.length + ' respuesta' + (allResp.length !== 1 ? 's' : ''); }
+
+  if (!allResp.length) {
+    container.innerHTML = '<div class="empty-state"><p>Sin respuestas aún</p><small>Los participantes escanean el QR y responden desde su dispositivo</small></div>';
+    return;
+  }
+
+  const domains = Object.keys(ITEMS);
+  const filtered = filterGroup === 'all' ? allResp : allResp.filter(r => r.group === filterGroup);
+
+  const byGroup = { A:[], B:[], C:[] };
+  allResp.forEach(r => {
+    const e = { group: r.group };
+    domains.forEach(d => { e[d] = domainScore(r.answers, d); });
+    e.total = totalScore(r.answers);
+    if (byGroup[r.group]) byGroup[r.group].push(e);
+  });
+
+  const nG = { A: byGroup.A.length, B: byGroup.B.length, C: byGroup.C.length };
+
+  const filtScored = filtered.map(r => {
+    const e = { group: r.group };
+    domains.forEach(d => { e[d] = domainScore(r.answers, d); });
+    e.total = totalScore(r.answers);
+    return e;
+  });
+
+  const avgFD = d => avg(filtScored.map(e => e[d]));
+  const avgFT = () => avg(filtScored.map(e => e.total));
+  const avgGD = (g,d) => avg(byGroup[g].map(e => e[d]));
+  const avgGT = g => avg(byGroup[g].map(e => e.total));
+  const scoreColor = s => s === null ? '#9b9890' : s >= 70 ? '#3aacbf' : s >= 40 ? '#b865a8' : '#c4607e';
+
+  container.innerHTML = `
+    <div class="metrics-row">
+      <div class="metric"><div class="metric-label">Total respuestas</div><div class="metric-val">${allResp.length}</div><div class="metric-sub">todos los grupos</div></div>
+      <div class="metric"><div class="metric-label">≤ 160 cm</div><div class="metric-val">${nG.A}</div><div class="metric-sub">participantes</div></div>
+      <div class="metric"><div class="metric-label">161–175 cm</div><div class="metric-val">${nG.B}</div><div class="metric-sub">participantes</div></div>
+      <div class="metric"><div class="metric-label">> 175 cm</div><div class="metric-val">${nG.C}</div><div class="metric-sub">participantes</div></div>
+      <div class="metric"><div class="metric-label">CVS promedio</div><div class="metric-val" style="color:${scoreColor(avgFT())}">${avgFT() ?? '—'}</div><div class="metric-sub">${filterGroup==='all'?'todos':GM[filterGroup].label} · 0–100</div></div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">Puntaje por dominio</div>
+        <div class="chart-sub">Grupo seleccionado (n=${filtered.length}) · 0–100, mayor = mejor CVS</div>
+        <div style="position:relative;height:220px;"><canvas id="ch-d" role="img" aria-label="Puntajes por dominio">Barras por dominio.</canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">CVS total por grupo de estatura</div>
+        <div class="chart-sub">Puntaje total promedio · escala 0–100</div>
+        <div class="legend-row">${['A','B','C'].map(g=>`<span class="legend-item"><span class="legend-sq" style="background:${GM[g].color};border:1px solid ${GM[g].dk}"></span>${GM[g].label} (n=${nG[g]})</span>`).join('')}</div>
+        <div style="position:relative;height:175px;"><canvas id="ch-g" role="img" aria-label="CVS por grupo">Barras por grupo.</canvas></div>
+      </div>
+      <div class="chart-card full">
+        <div class="chart-title">Comparación por dominio y grupo de estatura</div>
+        <div class="chart-sub">Puntaje promedio por dominio según grupo · Mayor = mejor calidad de vida</div>
+        <div class="legend-row">${['A','B','C'].map(g=>`<span class="legend-item"><span class="legend-sq" style="background:${GM[g].color};border:1px solid ${GM[g].dk}"></span>${GM[g].label}</span>`).join('')}</div>
+        <div style="position:relative;height:260px;"><canvas id="ch-c" role="img" aria-label="Comparación dominios por grupo">Barras agrupadas.</canvas></div>
+      </div>
+    </div>
+
+    <div class="table-card">
+      <table>
+        <thead><tr>
+          <th>Dominio</th>
+          <th>Promedio (n=${filtered.length})</th>
+          <th>≤ 160 cm (n=${nG.A})</th>
+          <th>161–175 cm (n=${nG.B})</th>
+          <th>> 175 cm (n=${nG.C})</th>
+        </tr></thead>
+        <tbody>
+          ${domains.map(d => {
+            const a = avgFD(d);
+            const m = DM[d];
+            return `<tr>
+              <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${m.dk};margin-right:7px;vertical-align:middle"></span>${m.label}</td>
+              <td><div class="score-bar-wrap"><span class="score-bar" style="width:${Math.round((a??0)*0.8)}px;background:${m.color};border:1px solid ${m.dk}"></span><span style="font-weight:500;margin-left:4px;color:${scoreColor(a)}">${a??'—'}</span></div></td>
+              <td style="font-weight:500;color:${scoreColor(avgGD('A',d))}">${nG.A?(avgGD('A',d)??'—'):'—'}</td>
+              <td style="font-weight:500;color:${scoreColor(avgGD('B',d))}">${nG.B?(avgGD('B',d)??'—'):'—'}</td>
+              <td style="font-weight:500;color:${scoreColor(avgGD('C',d))}">${nG.C?(avgGD('C',d)??'—'):'—'}</td>
+            </tr>`;
+          }).join('')}
+          <tr style="background:var(--bg3)">
+            <td style="font-weight:500">Total CVS</td>
+            <td><span style="font-weight:500;color:${scoreColor(avgFT())}">${avgFT()??'—'}</span></td>
+            <td style="font-weight:500;color:${scoreColor(avgGT('A'))}">${nG.A?(avgGT('A')??'—'):'—'}</td>
+            <td style="font-weight:500;color:${scoreColor(avgGT('B'))}">${nG.B?(avgGT('B')??'—'):'—'}</td>
+            <td style="font-weight:500;color:${scoreColor(avgGT('C'))}">${nG.C?(avgGT('C')??'—'):'—'}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note-footer">
+      Método: Bullinger et al. 2013 · Score dominio = (media ítems ÷ 4) × 100 · Score total = media de dominios<br>
+      Ítems invertidos (score = 4 − respuesta): S1, S2, E1, E3 · Ítems directos: F1, F2, F3, S3, E2, A1, A2<br>
+      Rango 0–100 · Mayor puntaje = mejor calidad de vida percibida
+    </p>
+  `;
+
+  Object.values(charts).forEach(c => { try { c.destroy(); } catch(e){} });
+  charts = {};
+
+  charts.d = new Chart(document.getElementById('ch-d'), {
+    type:'bar',
+    data: {
+      labels: domains.map(d => DM[d].label),
+      datasets: [{ data: domains.map(d => avgFD(d)??0), backgroundColor: domains.map(d=>DM[d].color), borderColor: domains.map(d=>DM[d].dk), borderWidth:1.5, borderRadius:6, borderSkipped:false }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{min:0,max:100,ticks:{callback:v=>v,font:{size:11}},grid:{color:'rgba(0,0,0,0.05)'}}, x:{ticks:{font:{size:11}},grid:{display:false}} } }
+  });
+
+  charts.g = new Chart(document.getElementById('ch-g'), {
+    type:'bar',
+    data: {
+      labels: ['≤ 160 cm','161–175 cm','> 175 cm'],
+      datasets: [{ data:['A','B','C'].map(g=>avgGT(g)??0), backgroundColor:['#e8a0b4','#beedf3','#ede7f3'], borderColor:['#c4607e','#3aacbf','#7b5ea7'], borderWidth:1.5, borderRadius:6, borderSkipped:false }]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{min:0,max:100,ticks:{callback:v=>v,font:{size:11}},grid:{color:'rgba(0,0,0,0.05)'}}, x:{ticks:{font:{size:11}},grid:{display:false}} } }
+  });
+
+  charts.c = new Chart(document.getElementById('ch-c'), {
+    type:'bar',
+    data: {
+      labels: domains.map(d=>DM[d].label),
+      datasets: [
+        { label:'≤ 160 cm',   data:domains.map(d=>avgGD('A',d)??0), backgroundColor:'#e8a0b4', borderColor:'#c4607e', borderWidth:1.5, borderRadius:5, borderSkipped:false },
+        { label:'161–175 cm', data:domains.map(d=>avgGD('B',d)??0), backgroundColor:'#beedf3', borderColor:'#3aacbf', borderWidth:1.5, borderRadius:5, borderSkipped:false },
+        { label:'> 175 cm',   data:domains.map(d=>avgGD('C',d)??0), backgroundColor:'#ede7f3', borderColor:'#7b5ea7', borderWidth:1.5, borderRadius:5, borderSkipped:false }
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{min:0,max:100,ticks:{callback:v=>v,font:{size:11}},grid:{color:'rgba(0,0,0,0.05)'}}, x:{ticks:{autoSkip:false,font:{size:11}},grid:{display:false}} } }
+  });
+}
+
+function clearData() {
+  if (!confirm('¿Eliminar todas las respuestas de Firebase? Esta acción no se puede deshacer.')) return;
+  responsesRef.remove().then(() => {
+    responses = {};
+    Object.values(charts).forEach(c => { try { c.destroy(); } catch(e){} });
+    charts = {};
+    document.getElementById('dash-content').innerHTML = '<div class="empty-state"><p>Datos eliminados</p><small>Listo para una nueva sesión</small></div>';
+  }).catch(err => {
+    alert('Error al eliminar. Verifique su conexión.');
+    console.error(err);
+  });
+}
+
+function switchView(view) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-' + view).classList.add('active');
+  document.querySelectorAll('.nav-btn')[view==='survey'?0:1].classList.add('active');
+  if (view === 'dashboard') renderDashboard();
+}
+
+buildSurvey();
+</script>
+</body>
+</html>
